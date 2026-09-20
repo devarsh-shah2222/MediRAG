@@ -68,15 +68,22 @@ sequenceDiagram
 
 ## Frontend module map (`apps/web`)
 
-- `app/` -- one route per screen (App Router), each a client component that
-  calls the API directly via `lib/api.ts`.
+- `app/` -- one route per screen (App Router). Chat/Login/Register/Admin are
+  client components that call the API via `lib/api.ts`; Medicine/Prescription/
+  Doctors are plain server components rendering `ComingSoon` (see
+  [DECISIONS.md](DECISIONS.md#coming-soon-gating-for-ocrmaps-dependent-pages)
+  -- they're gated behind real OCR/maps providers that aren't wired up).
 - `components/ui/` -- the design system primitives (Button/LinkButton, Card,
   Alert, Badge, Input/Textarea, Skeleton, EmptyState). Deliberately small.
 - `components/` -- feature components: `ChatMessage`, `EmergencyBanner`,
   `EvidencePanel` (native `<details>`, no dialog/collapsible library), `NavBar`,
-  `LanguageSelector`.
+  `ComingSoon`, `Logo`/`EkgLine` (the heartbeat-mark branding, reused across
+  the logo, the chat "thinking" indicator, and `RouteLoadingOverlay`, which
+  covers both page navigation and full reloads with the same animation).
 - `lib/i18n/` -- hand-rolled dictionary-based i18n (`en`/`hi`/`gu`) + React
-  context; no i18n framework (see [DECISIONS.md](DECISIONS.md)).
+  context; no i18n framework (see [DECISIONS.md](DECISIONS.md)). No
+  in-product language switcher currently -- removed as unnecessary at this
+  stage; the dictionaries and context stay wired up for later.
 - `lib/api.ts` -- typed fetch wrapper; `lib/session.ts` -- anonymous
   per-browser session id for guest chat history grouping.
 
@@ -91,6 +98,18 @@ Two merges from the original spec's entity list, both documented in
 [DECISIONS.md](DECISIONS.md): `MedicineAlias` folded into
 `Medicine.aliases` (array column), and `ProviderLocation` folded into
 `Provider` (one row per location).
+
+## Deployment
+
+The two halves are deployed separately, not as one monorepo build: the API
+(`services/api`) runs on Render as a Docker web service with a managed
+Postgres, and the web app (`apps/web`) is deployed to Vercel with its Root
+Directory set to `apps/web` (a bare monorepo root would build neither
+correctly). Ollama is dropped from the production provider chain -- it needs
+a persistent GPU/CPU box, not a serverless/PaaS host -- so the deployed
+cascade is Gemini -> Groq only, still validated identically. Full steps and
+the gotchas hit getting there are in
+[DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Why this shape
 

@@ -190,17 +190,23 @@ and there's demand for a specific deferred feature.
 **Decision**: `LLMProvider`, `OCRProvider`, `ProviderDirectory`, and
 `EmbeddingProvider` are all interfaces with a deterministic mock
 implementation as the default, selected via env vars
-(`LLM_PROVIDER`/`OCR_PROVIDER`/`MAPS_PROVIDER`). Two real `LLMProvider`
-implementations exist behind the same interface: `AnthropicProvider` and
-`GeminiProvider` (`google-genai` SDK), both built on shared prompt-building
-helpers (`_build_system_prompt`/`_build_user_message` in `providers/llm.py`)
-so the citation-marker contract and prompt-injection framing is identical
-regardless of which model answers.
+(`LLM_PROVIDER`/`OCR_PROVIDER`/`MAPS_PROVIDER`). Four real `LLMProvider`
+implementations now exist behind the same interface -- `AnthropicProvider`,
+`GeminiProvider`, `GroqProvider`, `OllamaProvider` -- all built on shared
+prompt-building helpers (`_build_system_prompt`/`_build_user_message` in
+`providers/llm.py`) so the citation-marker contract and prompt-injection
+framing is identical regardless of which model answers.
 **Why**: no API keys were available at build time; building real
-architecture behind swappable interfaces means this is a config change
-later, not a rewrite, and the app is fully runnable and testable today.
-**Revisit when**: real credentials (Anthropic, an OCR provider, a maps/places
-provider) are available.
+architecture behind swappable interfaces means adding a real provider is a
+config change later, not a rewrite.
+**Update -- no longer purely hypothetical**: real Gemini + Groq credentials
+were later provided and are what the live deployment actually runs (see
+[DEPLOYMENT.md](DEPLOYMENT.md)) -- this decision's bet paid off exactly as
+intended: swapping in real providers took zero code changes. OCR and maps
+remain mock-only; no credentials for those have been provided or requested.
+**Revisit when**: an OCR provider or a maps/places provider becomes
+available (unblocks the Medicine/Prescription/Doctors pages -- see
+"Coming Soon gating" below).
 
 ## pgvector, not Qdrant
 
@@ -292,3 +298,77 @@ httpOnly cookie, with a server-side `auth_sessions` table for revocation.
 (provider registration, callback handling, account linking) for no stated
 requirement.
 **Revisit when**: a specific identity provider is requested.
+
+## Coming Soon gating for OCR/Maps-dependent pages
+
+**Decision**: Medicine, Prescription, and Doctors -- the three routes whose
+real functionality depends on OCR or a maps/places provider, neither of
+which has real credentials -- now render a shared `ComingSoon` component
+instead of their previous mock-backed forms. Chat (renamed "MediAssist" in
+the nav) is unaffected; it's the one feature with a real, live provider
+chain behind it.
+**Why**: a mock-backed scanner/upload UI that silently can't do the thing it
+visually promises (extract text from a photo, find a real nearby provider)
+is worse than being upfront that it's not built yet -- a user who uploads a
+prescription photo and gets a canned mock response has been misled, not
+helped. The previous mock UI was fine while the whole app was explicitly a
+provider-interface demo; it stopped being fine once the app had a real,
+live deployment other people would actually visit.
+**What was kept, not deleted**: the backend routers, mock providers, and all
+existing tests for `/api/medicine`, `/api/prescription`, and `/api/providers`
+are untouched -- this is a frontend-only gate. Re-enabling any of the three
+is flipping one page back to its previous implementation, not rebuilding a
+feature.
+**Revisit when**: a real OCR provider or a real maps/places provider gets
+credentials -- see the "Mock providers by default" entry above.
+
+## Render (API) + Vercel (web), deployed separately
+
+**Decision**: `services/api` deploys to Render as a Docker web service with
+a managed Postgres (`render.yaml` blueprint); `apps/web` deploys to Vercel
+with its Root Directory set to `apps/web`. Not one platform for both, and
+not a single combined build.
+**Why**: Vercel's model (serverless functions, edge-first) fits a Next.js
+frontend well but not a stateful FastAPI service with Postgres and
+long-running LLM calls; Render's Docker-based web services fit the backend
+well but add nothing for a static/SSR Next.js app that Vercel doesn't
+already do better. Splitting them is the boring, well-supported path for
+each half rather than forcing one host to do both adequately.
+**Real gotchas hit getting there, each now fixed and worth recording**:
+- **Monorepo Root Directory.** Vercel's GitHub-triggered builds clone the
+  whole repo and build from a configurable Root Directory, which defaults
+  to the repo root -- wrong for this layout. Manual `vercel --prod` deploys
+  run from inside `apps/web` happened to work anyway (the CLI uploads only
+  the cwd), which masked the misconfiguration until GitHub-triggered
+  auto-deploy hit it with a real "Couldn't find any `pages` or `app`
+  directory" build failure. Fixed by setting Root Directory to `apps/web`
+  in Project Settings -- there's no `vercel.json` key or CLI command for
+  this, it's dashboard/API-only.
+- **Hosted Postgres URL scheme.** Render (like most managed Postgres hosts)
+  hands out a plain `postgresql://` connection string, which SQLAlchemy
+  resolves to the psycopg2 dialect -- not installed here, only psycopg
+  (v3) is. Fixed by normalizing the scheme to `postgresql+psycopg://` in
+  `app/db.py`, applied to both the app's engine and Alembic's `env.py`
+  (which read `database_url` directly, bypassing the app's normalization
+  until it got its own call to the same helper).
+- **A pip conflict a clean install always would have caught.** `httpx` and
+  `pydantic` were pinned to versions older than what `google-genai` (added
+  later) actually requires. The local `.venv` never caught this because
+  packages were added incrementally over many sessions rather than
+  resolved from a clean slate -- Render's clean Docker build did. Fixed by
+  dropping the unnecessary `httpx` pin (never imported directly here, only
+  by SDKs) and widening `pydantic` to the range `google-genai` needs.
+- **No Ollama in production.** The fourth provider needs a persistent
+  GPU/CPU box, not a serverless/PaaS host; the deployed cascade is
+  Gemini -> Groq, one link shorter than local dev, validated identically.
+- **Seed/ingest as a resilient boot step, not a manual one.** Both scripts
+  are idempotent (existence/content-hash checked), so they run on every
+  container boot rather than requiring a one-time manual Shell command
+  that's easy to forget or, on some hosts, hard to even find. The
+  network-dependent `ingest_real_sources` step is `|| true`'d so a
+  transient fetch failure there can never block the API itself from
+  starting -- worst case that boot adds no new content, and the next
+  successful one does.
+**Revisit when**: traffic or cost outgrows either free tier, or a real
+Ollama-equivalent hosted-GPU option becomes worth the cost for the fourth
+provider.
