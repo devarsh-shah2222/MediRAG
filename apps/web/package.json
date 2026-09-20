@@ -1,0 +1,34 @@
+{
+  "name": "medirag-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "@types/node": "20.16.11",
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.0",
+    "tailwindcss": "3.4.13",
+    "postcss": "8.4.47",
+    "autoprefixer": "10.4.20",
+    "vitest": "2.1.2",
+    "@vitejs/plugin-react": "4.3.2",
+    "@testing-library/react": "16.0.1",
+    "@testing-library/jest-dom": "6.5.0",
+    "jsdom": "25.0.1",
+    "@playwright/test": "1.48.0"
+  }
+}
