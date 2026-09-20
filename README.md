@@ -15,13 +15,26 @@ but thinner slices. See [DECISIONS.md](docs/DECISIONS.md) for what was
 deliberately simplified and why, and the **Known limitations** section below
 for what's out of scope for this pass.
 
+## Live demo
+
+- **Web app**: https://medirag-app.vercel.app
+- **API**: https://medirag-api.onrender.com (interactive docs at `/docs`)
+
+Both run on free tiers: the API may take ~30s to wake up after being idle,
+and Gemini's free daily quota (20 requests) means the LLM cascade below can
+fall back to Groq -- or abstain, if a request catches both exhausted at
+once -- under heavy testing.
+
 ## Stack
 
 - **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
 - **Backend**: FastAPI, SQLAlchemy, Alembic
 - **Database**: PostgreSQL + pgvector (single database, no separate vector DB service)
-- **LLM / OCR / Maps**: pluggable provider interfaces, defaulting to deterministic
-  mock implementations so the whole app runs with zero external API keys
+- **LLM / OCR / Maps**: pluggable provider interfaces. The code defaults to
+  deterministic mock implementations (so it also runs with zero external API
+  keys, e.g. for tests), but the live demo above runs the real
+  Gemini -> Groq -> Ollama LLM cascade against real API keys -- see
+  **Known limitations** below. OCR and maps remain mock-only.
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture and
 [RAG_ARCHITECTURE.md](docs/RAG_ARCHITECTURE.md) / [SAFETY.md](docs/SAFETY.md) for the two
