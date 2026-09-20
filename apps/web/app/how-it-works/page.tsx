@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/Card";
 const STEPS = [
   {
     title: "You ask, in plain language",
-    body: "Ask about a health topic, a medicine, or upload a prescription or medicine package.",
+    body: "Ask MediAssist about a health topic or a medicine by name. (Uploading a prescription or medicine photo is coming soon -- it needs a real OCR provider we haven't wired up yet.)",
   },
   {
     title: "We retrieve trusted references first",
