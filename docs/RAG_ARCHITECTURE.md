@@ -179,10 +179,13 @@ the single enforcement point for all of them -- a locally-run model is not
 exempt from citing real evidence just because it's offline.
 
 When `LLM_PROVIDER=gemini`, these aren't independent alternatives but an
-ordered chain (`CascadingLLMProvider`: Gemini -> Groq -> Ollama), escalating
-on either an exception or a validated-vague answer -- see DECISIONS.md for
-why escalating on "vague" is safe here specifically (every candidate is
-checked by the same validator below against the same evidence before being
+ordered chain (`CascadingLLMProvider`: Gemini -> Groq -> Ollama locally,
+Gemini -> Groq in production -- Ollama needs a persistent GPU/CPU box a
+serverless/PaaS host doesn't give you, see
+[DEPLOYMENT.md](DEPLOYMENT.md)), escalating on either an exception or a
+validated-vague answer -- see [DECISIONS.md](DECISIONS.md) for why
+escalating on "vague" is safe here specifically (every candidate is checked
+by the same validator below against the same evidence before being
 trusted).
 
 - Parses `<sentence>[[cite:ID]]` units with a regex that ties each marker to
@@ -199,8 +202,8 @@ trusted).
 This is why prompt injection embedded in a retrieved document is inert by
 construction (see `tests/test_chat_api.py::test_retrieved_document_with_injected_instructions_is_treated_as_data`):
 the mock provider only ever emits cited excerpts of the retrieved text, and
-the Anthropic system prompt explicitly tells the model the evidence block is
-data, not instructions, on top of that.
+every real provider's shared system prompt explicitly tells the model the
+evidence block is data, not instructions, on top of that.
 
 **Known limitation, found live, not yet fixed**: `claims.py` verifies that a
 cited chunk id was actually in the retrieved set -- it does NOT verify that
