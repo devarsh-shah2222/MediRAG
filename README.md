@@ -11,7 +11,7 @@ prescribe, and never tells a user to start, stop, or change a medication.
 This is a core-first MVP: chat + RAG + evidence/citations + safety triage +
 medication info are implemented deeply and tested. Other features (scanner,
 prescription explainer, doctor finder, multilingual UI, admin) are functional
-but thinner slices. See [DECISIONS.md](DECISIONS.md) for what was
+but thinner slices. See [DECISIONS.md](docs/DECISIONS.md) for what was
 deliberately simplified and why, and the **Known limitations** section below
 for what's out of scope for this pass.
 
@@ -23,9 +23,9 @@ for what's out of scope for this pass.
 - **LLM / OCR / Maps**: pluggable provider interfaces, defaulting to deterministic
   mock implementations so the whole app runs with zero external API keys
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full picture and
-[RAG_ARCHITECTURE.md](RAG_ARCHITECTURE.md) / [SAFETY.md](SAFETY.md) for the two
-most safety-critical subsystems.
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full picture and
+[RAG_ARCHITECTURE.md](docs/RAG_ARCHITECTURE.md) / [SAFETY.md](docs/SAFETY.md) for the two
+most safety-critical subsystems. Deployment steps are in [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Run locally with Docker
 
@@ -43,7 +43,7 @@ docker compose -f infra/docker-compose.yml exec api python -m scripts.ingest_rea
 ```
 
 The second command fetches real content live from openFDA (drug labels) and
-MedlinePlus (NIH health topics) -- see [RAG_ARCHITECTURE.md](RAG_ARCHITECTURE.md#real-reference-content)
+MedlinePlus (NIH health topics) -- see [RAG_ARCHITECTURE.md](docs/RAG_ARCHITECTURE.md#real-reference-content)
 for what it ingests and why those two sources.
 
 - Web: http://localhost:3000
@@ -59,7 +59,7 @@ python -m venv .venv
 .venv/Scripts/activate   # or `source .venv/bin/activate` on macOS/Linux
 pip install -r requirements.txt
 # Postgres+pgvector required for production use; for local dev without Docker,
-# point DATABASE_URL at sqlite:///./dev.db instead -- see ENVIRONMENT.md.
+# point DATABASE_URL at sqlite:///./dev.db instead -- see docs/ENVIRONMENT.md.
 alembic upgrade head      # only when using Postgres; sqlite dev falls back to create_all via the seed script
 python -m scripts.seed
 python -m scripts.ingest_real_sources   # fetches real content from openFDA + MedlinePlus
@@ -97,7 +97,7 @@ The RAG corpus is real content, not fabricated or hand-authored text: **openFDA*
 (NIH/National Library of Medicine consumer health summaries) for the four
 health topics. Both are public-domain U.S. government works, fetched live by
 `scripts/ingest_real_sources.py` (not scraped from arbitrary sites). See
-[RAG_ARCHITECTURE.md](RAG_ARCHITECTURE.md#real-reference-content) for the
+[RAG_ARCHITECTURE.md](docs/RAG_ARCHITECTURE.md#real-reference-content) for the
 ingestion pipeline, what content is deliberately excluded (dosage/frequency
 text), and known content-quality caveats of automated real-source ingestion.
 
@@ -110,7 +110,7 @@ amlodipine, azithromycin, cetirizine) via the same real openFDA pipeline, plus
 verified-real Indian brand names (Crocin, Dolo, Calpol, Brufen, Novamox,
 Glycomet, Amlong, Amlopres, Azithral, Alerid) wired in as query synonyms, so
 asking about a brand name retrieves the right generic-name content. See
-[DECISIONS.md](DECISIONS.md) for the research behind this and what a future,
+[DECISIONS.md](docs/DECISIONS.md) for the research behind this and what a future,
 more India-specific source would need.
 
 ## Known limitations (deferred, tracked)
@@ -123,7 +123,7 @@ more India-specific source would need.
   automatically moving to the next provider when one either raises (network
   error, API outage, rate limit, timeout) or produces an answer the citation
   validator would abstain on (unsupported/vague) -- see
-  `CascadingLLMProvider` in `providers/llm.py` and `DECISIONS.md`. Every
+  `CascadingLLMProvider` in `providers/llm.py` and `docs/DECISIONS.md`. Every
   candidate answer is checked against the *same* retrieved evidence with the
   *same* validator regardless of which provider produced it, so cascading
   can only ever surface a better-grounded answer or fall through to the same
@@ -143,7 +143,7 @@ more India-specific source would need.
   ~5s) was tried as a faster alternative and rejected: tested live in the
   same failure scenario, it fabricated medical content and attached a real
   but unrelated citation to it, an error the validator only caught by
-  accident (see `RAG_ARCHITECTURE.md`'s claim-validation section). The
+  accident (see `docs/RAG_ARCHITECTURE.md`'s claim-validation section). The
   emergency safety path is unaffected by any of this either way -- it
   short-circuits before reaching any LLM (confirmed live at ~0.08s
   regardless of provider or quota state), so a slow or unavailable model
@@ -153,13 +153,13 @@ more India-specific source would need.
   tokenizes ASCII word characters, so a query typed entirely in Hindi/Gujarati
   script will usually retrieve no evidence and abstain, even though the UI
   and API correctly handle the language end-to-end. A real embedding model
-  fixes this; see [DECISIONS.md](DECISIONS.md).
+  fixes this; see [DECISIONS.md](docs/DECISIONS.md).
 - **No real map tiles** on the Doctors page; it's list-first with a "get
   directions" link out to OpenStreetMap.
 - **No exhaustive security/accessibility/load-test suites.** Core safety and
   auth paths are tested; a full WCAG automated gate, penetration-style
   security tests, and load testing are not implemented.
-- Only 6 of the 15 documents from the original spec exist
-  (README, ARCHITECTURE, SAFETY, RAG_ARCHITECTURE, DECISIONS, ENVIRONMENT).
-  PRODUCT_SPEC, UX_GUIDELINES, SECURITY, THREAT_MODEL, API, DATABASE, TESTING,
-  EVALUATION, DEPLOYMENT are not written.
+- Only 7 of the 15 documents from the original spec exist, all in `docs/`
+  except this README (ARCHITECTURE, SAFETY, RAG_ARCHITECTURE, DECISIONS,
+  ENVIRONMENT, DEPLOYMENT). PRODUCT_SPEC, UX_GUIDELINES, SECURITY,
+  THREAT_MODEL, API, DATABASE, TESTING, EVALUATION are not written.
